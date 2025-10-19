@@ -164,7 +164,6 @@ import statsmodels.formula.api as smf
 import scipy.stats as stats
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 
-
 def season_from_month(m):
     """Map month->season (text)"""
     if m in [12, 1, 2]:
@@ -201,32 +200,15 @@ def compute_vif(X_df):
     return pd.DataFrame(vif, columns=["variable", "VIF"])
 
 # Load datasets
-df1 = pd.read_csv("dataset1.csv")  # Bat dataset
-df2 = pd.read_csv("dataset2.csv")  # Rat dataset
+d1 = pd.read_csv("dataset1.csv")  # Bat dataset
+d2 = pd.read_csv("dataset2.csv")  # Rat dataset
 
 # Print basic info
-print("Dataset 1 columns:", df1.columns.tolist())
-print("Dataset 2 columns:", df2.columns.tolist())
-
-# Parse datetime columns
-df1["start_time"] = parse_dt(df1["start_time"])
-df1["rat_period_start"] = parse_dt(df1["rat_period_start"])
-df1["rat_period_end"] = parse_dt(df1["rat_period_end"])
-df1["sunset_time"] = parse_dt(df1["sunset_time"])
-df2["time"] = parse_dt(df2["time"])
-
-# Merge on 30-minute intervals
-df1["time_block"] = df1["start_time"].dt.floor("30min")
-df2["time_block"] = df2["time"].dt.floor("30min")
-merged = pd.merge(df1, df2[["time_block", "rat_minutes", "rat_arrival_number", "bat_landing_number", "food_availability"]],
-                  on="time_block", how="left")
+print("Dataset 1 columns:", d1.columns.tolist())
+print("Dataset 2 columns:", d2.columns.tolist())
 
 # Feature Engineering
 merged["rat_presence"] = (merged["rat_minutes"] > 0).astype(int)
-merged["rat_intensity"] = merged["rat_minutes"] * merged["rat_arrival_number"]
-merged["bat_activity_rate"] = merged["bat_landing_number"] / (merged["rat_arrival_number"] + 1)
-merged["food_pressure"] = merged["rat_minutes"] / (merged["food_availability"] + 1)
-merged["hours_after_sunset_sq"] = merged["hours_after_sunset"] ** 2
 
 # Add season based on month
 if "month" in merged.columns:
@@ -234,11 +216,6 @@ if "month" in merged.columns:
     merged["season"] = merged["month"].apply(season_from_month)
 else:
     print("Warning: 'month' column not found in merged dataset.")
-
-response_var = "seconds_after_rat_arrival"
-explanatory_vars = ["rat_minutes", "rat_arrival_number", "bat_landing_number", "food_availability", "hours_after_sunset",
-                    "rat_presence", "rat_intensity", "bat_activity_rate", "food_pressure", "hours_after_sunset_sq"]
-
 
 # Visualize seasonal counts if 'season' column exists
 if "season" in merged.columns:
@@ -267,14 +244,6 @@ for i, var in enumerate(["rat_minutes", "rat_arrival_number", "bat_landing_numbe
 plt.tight_layout()
 plt.show()
 
-# Visualize the correlation heatmap between explanatory variables
-correlation_matrix = merged[explanatory_vars + [response_var]].corr()
-plt.figure(figsize=(10, 7))
-sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
-plt.title("Correlation Heatmap – Explanatory Variables and Response", fontsize=16)
-plt.tight_layout()
-plt.show()
-
 # Seasonal Breakdown: Summarize data by season
 season_summary = merged.groupby("season")[explanatory_vars + [response_var]].describe().transpose()
 print("\nSeasonal Summary Statistics:")
@@ -290,14 +259,14 @@ plt.tight_layout()
 plt.show()
 
 # Boxplot to visualize the distribution of explanatory variables across seasons
-plt.figure(figsize=(12, 8))
+plt.figure(figsize=(15, 10))
 for i, var in enumerate(explanatory_vars):
     plt.subplot(3, 4, i+1)
     sns.boxplot(x="season", y=var, data=merged, palette="muted")
     plt.title(f"Seasonal Distribution of {var}")
     plt.xlabel("Season")
     plt.ylabel(var)
-plt.tight_layout()
+plt.tight_layout(pad=3.0, w_pad=2.0, h_pad=2.0)  # Increased padding
 plt.show()
 
 # Descriptive summary of missing values (if any)
@@ -312,10 +281,6 @@ print(missing_summary)
 winter_df = merged[merged["season"] == "winter"]
 spring_df = merged[merged["season"] == "spring"]
 
-# Feature and target variable setup
-response_var = "seconds_after_rat_arrival"
-explanatory_vars = ["rat_minutes", "rat_arrival_number", "bat_landing_number", "food_availability", "hours_after_sunset",
-                    "rat_presence", "rat_intensity", "bat_activity_rate", "food_pressure", "hours_after_sunset_sq"]
 
 # Cleaning missing values
 merged = merged.dropna(subset=[response_var] + explanatory_vars)
@@ -383,13 +348,6 @@ if "season" in merged.columns:
 else:
     print("Season column is missing, skipping the Season Interaction Model.")
 
-
-# Correlation Heatmap
-plt.figure(figsize=(10, 7))
-sns.heatmap(merged[explanatory_vars + [response_var]].corr(), annot=True, cmap="coolwarm", fmt=".2f", linewidths=0.5)
-plt.title("Correlation Heatmap – Explanatory Variables and Response", fontsize=16)
-plt.tight_layout()
-plt.show()
 
 # Residual Plot
 plt.figure(figsize=(8, 5))
